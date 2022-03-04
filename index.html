@@ -1,0 +1,426 @@
+
+<!DOCTYPE html>
+<head>
+<title>Asher's Final Project</title>
+<script src="three.min.js"></script>
+<script src="GLTFLoader.js"></script>
+<script src="KeyboardState.js"></script>
+
+<script>
+  /*
+  Asher Uman
+  Final Project
+
+  Texture Sources: 
+  - Space: https://www.cleanpng.com/png-skybox-texture-mapping-cube-mapping-night-sky-2211099/
+  - Robot Textures: https://3dtextures.me/ and https://www.textures.com/download/wheels0028/12340
+  - Walls: https://3dtextures.me/
+
+  Text Code based on: https://stackoverflow.com/questions/15248872/dynamically-create-2d-text-in-three-js
+
+  Some code & comments based on class materials from CSC240, taught by Prof. Nicholas Howe
+  */
+    var scene, camera, renderer; // Three.js rendering basics.
+
+    var canvas; // The canvas on which the image is rendered.
+
+    // all the parts of the robot
+    var body = new THREE.Object3D();
+    var wheel1 = new THREE.Object3D();
+    var wheel2 = new THREE.Object3D();
+    //parent object
+    var bot = new THREE.Object3D();
+    //texture loader
+    var texLoader = new THREE.TextureLoader();
+    //parent object for walls and floor
+    var room;
+    var skyBox;
+  
+    var keyboard = new KeyboardState();
+    //variables for alien generation
+    var counter = 0;
+    var speedCounter = 0;
+    var speed = 200;
+    //aliens are put in list after being generated
+    var alien;
+    var aliens = [];
+    //variable to change alien size
+    var scale;
+    //for collision detection
+    var box;
+    //keep track of aliens killed
+    var killCount = 0;
+    var text2;
+
+    //create the scene
+    function createWorld() {
+        
+        renderer.setClearColor(0); // Set background color (0 = black)
+        scene = new THREE.Scene(); // Create a new scene which we can add objects to.
+    
+        // create a camera
+        camera = new THREE.PerspectiveCamera(60, canvas.width/canvas.height, 1, 5000);
+        camera.position.set(0,10,15);
+        camera.rotation.set(-.3,0,0);
+      
+        //add lighting
+        var ambientLight = new THREE.AmbientLight(0xffffff,0.5);
+        scene.add(ambientLight);
+        var light = new THREE.DirectionalLight( 0xffffff, 0.5 );
+        light.position.set( 10, 15, 0 );
+        scene.add(light);
+      
+        //create room
+        var planeGeometry = new THREE.PlaneGeometry( 50, 50 );
+        var planeGeometry2 = new THREE.PlaneGeometry( 50, 10 );
+        var sideGeometry = new THREE.PlaneGeometry( 10, 30 );
+      
+        //texture for floor w/ bumpmap
+        var fTexture = texLoader.load("floor.jpg");
+        var floorMaterial = new THREE.MeshPhongMaterial( { map: fTexture, side: THREE.DoubleSide } );
+        floorMaterial.bumpMap = texLoader.load("floorh.png");
+        floorMaterial.bumpScale = .8;
+
+        //create floor and add to scene
+        var floor = new THREE.Mesh( planeGeometry, floorMaterial );
+        floor.position.z = -10;
+        floor.rotation.x = Math.PI/2;
+        floor.position.y = -5;
+        scene.add( floor );
+
+        //texture for the sides of the window
+        var wallTexture2 = texLoader.load("metal.jpg");
+        wallTexture2.wrapS = THREE.RepeatWrapping;
+        wallTexture2.wrapT = THREE.RepeatWrapping;
+        wallTexture2.repeat.set( .5, 1 );
+
+        //texture for walls w/ bumpmap
+        var newMaterial = new THREE.MeshPhongMaterial( { map: wallTexture2, side: THREE.DoubleSide } );
+        newMaterial.bumpMap = texLoader.load("metalhh.png");
+        newMaterial.bumpScale = .5;
+
+        //texture and material for the window
+        var wallTexture = texLoader.load("metal.jpg");
+        wallTexture.wrapS = THREE.RepeatWrapping;
+        wallTexture.wrapT = THREE.RepeatWrapping;
+        wallTexture.repeat.set( 2.5, 1/3 );
+        var w1Material = new THREE.MeshPhongMaterial( { map: wallTexture, side: THREE.DoubleSide } );
+        w1Material.bumpMap = texLoader.load("metalhh.png");
+        w1Material.bumpScale = .5;
+        //create and position walls around window
+        var wall1 = new THREE.Mesh( planeGeometry2, w1Material );
+        wall1.position.z = -35;
+        wall1.rotation.z = Math.PI;
+        scene.add( wall1 );
+        var wall1top = new THREE.Mesh( planeGeometry2, w1Material );
+        wall1top.position.z = -35;
+        wall1top.position.y = 40;
+        scene.add( wall1top );
+        var side1 = new THREE.Mesh( sideGeometry, newMaterial );
+        side1.position.set(20,20,-35);
+        side1.rotation.z = Math.PI;
+        scene.add(side1);
+        var side2 = new THREE.Mesh( sideGeometry, newMaterial );
+        side2.position.set(-20,20,-35);
+        side2.rotation.z = Math.PI;
+        scene.add(side2);
+
+        //right and left walls texture
+        var rlTexture = texLoader.load("e.jpg");
+        var rlBump = texLoader.load("eh.png");
+        var rlEmit = texLoader.load("ee.png"); //intended to emit light; doesn't work
+        //create wall material
+        var w2Material = new THREE.MeshStandardMaterial( { 
+          map: rlTexture,
+          bumpMap: rlBump,
+          emissiveMap: rlEmit,
+          emissive: 0xffffff,
+          side: THREE.DoubleSide
+        } );
+        //create walls
+        var wall2 = new THREE.Mesh( planeGeometry, w2Material );
+        wall2.position.z = -10;
+        wall2.rotation.y = Math.PI/2;
+        wall2.position.x = 25;
+        wall2.position.y = 20;
+        scene.add( wall2 );
+
+        var wall3 = new THREE.Mesh( planeGeometry, w2Material );
+        wall3.position.z = -10;
+        wall3.rotation.y = Math.PI/2;
+        wall3.position.x = -25;
+        wall3.position.y = 20;
+        scene.add( wall3 );
+
+        //create room
+       room = new THREE.Object3D();
+       room.add(floor);
+       room.add(wall1);
+       room.add(wall2);
+       room.add(side1);
+       room.add(side2);
+       room.add(wall1top);
+       room.add(wall3);
+       scene.add(room); 
+
+       room.scale.set(.75,.5,.5);
+
+       //create Skybox (space background)
+       var sphereGeometry = new THREE.SphereGeometry(50, 30, 30);
+       var spaceMaterial = new THREE.MeshBasicMaterial( { color: "white", side: THREE.DoubleSide} );
+       spaceMaterial.map = texLoader.load("space.png");
+       skyBox = new THREE.Mesh(sphereGeometry, spaceMaterial);
+       scene.add(skyBox);
+       skyBox.position.y = 5;
+
+        // Instantiate a loader
+        var loader = new THREE.GLTFLoader();
+
+        // Load the body resource
+        loader.load(
+            'robobody.glb',
+          
+            // function below is called when the resource is loaded
+            function ( gltf ) {
+                body = gltf.scene;  // search through the loaded file for the object we want
+                bot.add(body);
+                requestAnimationFrame( render );  // we don't want to start rendering until the model is loaded
+            },
+            
+            // called while loading is progressing
+            function ( xhr ) {
+                console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+            },
+
+            // called when loading has errors
+            function ( error ) {
+                console.log( 'An error happened' );
+            }
+        );
+
+        // Load the wheels resource
+        loader.load(
+            'wheel.glb',
+
+            // function below is called when the resource is loaded
+            function ( gltf ) {
+                wheel1 = gltf.scene;  // search through the loaded file for the object we want
+                scene.add( wheel1 );
+
+                wheel1.position.y = -.6;
+                wheel1.position.z = 1.3;
+
+                bot.add(wheel1);
+
+                requestAnimationFrame( render );  // we don't want to start rendering until the model is loaded
+            },
+            
+            // called while loading is progressing
+            function ( xhr ) {
+                console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+            },
+
+            // called when loading has errors
+            function ( error ) {
+                console.log( 'An error happened' );
+            }
+        );
+
+        loader.load(
+            'wheel2.glb',
+
+            // function below is called when the resource is loaded
+            function ( gltf ) {
+                wheel2 = gltf.scene;  // search through the loaded file for the object we want
+                scene.add( wheel2 );
+
+                wheel2.position.z = -1.3;
+                wheel2.position.y = -.6;
+                
+                bot.add(wheel2);
+                 
+                requestAnimationFrame( render );  // we don't want to start rendering until the model is loaded
+            },
+            
+            // called while loading is progressing
+            function ( xhr ) {
+                console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+            },
+
+            // called when loading has errors
+            function ( error ) {
+                console.log( 'An error happened' );
+            }
+        );
+
+        //add parent object to scene
+        scene.add(bot);
+        bot.position.y = -1;
+
+        //create a box to use for collision detection
+        var boxGeometry = new THREE.BoxGeometry(2, 2, 3);
+        var boxMaterial = new THREE.MeshBasicMaterial( { color: "blue" } );
+        box = new THREE.Mesh (boxGeometry, boxMaterial);
+        box.position.y = -1.5;
+
+        //create text (killcount display)
+        text2 = document.createElement('div');
+        text2.style.position = 'absolute';
+        text2.style.width = 100;
+        text2.style.height = 100;
+        text2.style.backgroundColor = "Black";
+        text2.style.color = "GreenYellow";
+        text2.style.fontFamily = "Courier";
+        text2.innerHTML = "> Aliens Killed: " + killCount + ".";
+        text2.style.top = 20 + 'px';
+        text2.style.left = 40 + 'px';
+        document.body.appendChild(text2);
+  }
+      //controls
+     function update() {
+        keyboard.update();
+        var speed = .03;
+
+        if ( keyboard.pressed("left") ) {
+            bot.rotation.y = 0;
+            box.rotation.y = 0;
+            if (bot.position.x > -15){
+              bot.position.x -= speed;
+              box.position.x -= speed;
+            }
+            wheel1.rotation.z += speed;
+            wheel2.rotation.z += speed;
+        }
+        if ( keyboard.pressed("right") ) {
+            bot.rotation.y = Math.PI;
+            box.rotation.y = Math.PI;
+            if (bot.position.x < 15){
+              bot.position.x += speed;
+              box.position.x += speed;
+            }
+            wheel1.rotation.z += speed;
+            wheel2.rotation.z += speed;
+        }
+        if ( keyboard.pressed("down") ) {
+            bot.rotation.y = Math.PI/2;
+            box.rotation.y = Math.PI/2;
+            if(bot.position.z < 5){
+              bot.position.z += speed;
+              box.position.z += speed;
+            }
+            wheel1.rotation.z += speed;
+            wheel2.rotation.z +=speed;
+        }
+        if ( keyboard.pressed("up") ) {
+           bot.rotation.y = -Math.PI/2;
+           box.rotation.y = -Math.PI/2;
+           if (bot.position.z > -15){
+              bot.position.z -= speed;
+              box.position.z -= speed;
+            }
+            wheel1.rotation.z += speed;
+            wheel2.rotation.z += speed;
+        }
+    }
+
+    function alienGen () { //creates an alien object of random size and position
+       var radius = (Math.random() * 0.5) +0.5;
+       var alienGeometry = new THREE.SphereGeometry(radius, 30, 30);
+
+       var alienTexture = texLoader.load("alien.jpg");
+       var alienMaterial = new THREE.MeshPhongMaterial( { map: alienTexture, side: THREE.DoubleSide } );
+       alienMaterial.bumpMap = texLoader.load("alienh.png");
+       alienMaterial.bumpScale = .9;
+
+       alien = new THREE.Mesh(alienGeometry, alienMaterial);
+       scene.add(alien);
+       alien.position.y = -1.5;
+       alien.position.x = (Math.random() * 30) -15;
+       alien.position.z = (Math.random() * 20) - 15;
+
+       aliens.push(alien);
+
+    }
+
+    function pulse (alien){
+      //make alien object pulse by changing scale
+      alien.scale.set (scale, scale, scale);
+    }
+
+    //collision detection 
+    function collisionDetect(){
+      var originPoint = box.position.clone();
+      for (var vi = 0; vi < box.geometry.vertices.length; vi++){
+        var localVertex = box.geometry.vertices[vi].clone();
+        var globalVertex = box.localToWorld(localVertex);
+        var directionVector = globalVertex.sub( originPoint);
+
+        var ray = new THREE.Raycaster( originPoint, directionVector.clone().normalize() );
+        var collisionResults = ray.intersectObjects(aliens);
+
+       if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length() ){
+          for (var x =0; x <aliens.length; x++ ){
+            if (aliens[x].position.x < collisionResults[0].point.x +1 && aliens[x].position.x > collisionResults[0].point.x -1  && aliens[x].position.z < collisionResults[0].point.z + 1 && aliens[x].position.z > collisionResults[0].point.z - 1){
+
+              scene.remove(aliens[x]);
+              aliens.splice(x, 1);
+              killCount++;
+              text2.innerHTML = "> Aliens Killed: " + killCount + ".";
+            }
+          }
+        }//if
+      }//for
+    }//function 
+
+
+    // Render the scene. This is called for each frame of the animation.
+    function render() {
+
+      requestAnimationFrame( render );
+
+      skyBox.rotation.y += .001; //move the stars in the background
+
+      scale = (Math.random() * .2) + .9; //generate a new scale
+      aliens.forEach(pulse); //all aliens pulse in unison
+      counter++;
+
+      if(counter>speed && aliens.length < 50){
+        alienGen(); //generates a new alien (max is 50 to avoid overloading)
+        counter = 0;
+        speedCounter++;
+        if (speedCounter>20 && speed > 25){ //25 is the hardest difficulty
+          speed = speed*.9;
+          speedCounter = 0;
+        }
+      }
+      collisionDetect(); //detect if collided w/ alien
+      renderer.render(scene, camera);
+      update(); //controls
+    }
+
+    //----------------------------------------------------------------------------------
+
+    // The init() function is called by the onload event when the document has loaded.
+    function init() {
+        try {
+            canvas = document.getElementById("glcanvas");
+            renderer = new THREE.WebGLRenderer( { canvas: canvas, antialias: true} );
+        }
+        catch (e) {
+            document.getElementById("canvas-holder").innerHTML = "<h3><b>WebGL is not available.</b><h3>";
+            return;
+        }
+    
+        // create world and render scene
+        createWorld();
+    }
+
+</script>
+
+</head>
+<body onload="init()">
+<div id="canvas-holder">
+    <canvas id="glcanvas" width="600" height="400"></canvas>
+</div>
+</body>
+</html>
